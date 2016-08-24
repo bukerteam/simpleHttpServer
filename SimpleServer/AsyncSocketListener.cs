@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -92,9 +93,13 @@ namespace SimpleServer
 
             if (readBytesCount > 0)
             {
-                stateObject.StringBuilder.Append(Encoding.ASCII.GetString(stateObject.Buffer, 0, readBytesCount));
+                stateObject.StringBuilder.Append(
+                    Encoding.ASCII.GetString(
+                        stateObject.Buffer, 
+                        0, 
+                        readBytesCount));
 
-                if (stateObject.ReceivedData.IndexOf("<EOF>", StringComparison.Ordinal) > -1)
+                if (stateObject.ReceivedData.IndexOf("q", StringComparison.Ordinal) > -1)
                 {
                     Console.WriteLine("Read {0} bytes from socket. \n Data : {1}",
                         stateObject.ReceivedData.Length, 
@@ -128,6 +133,8 @@ namespace SimpleServer
             Console.WriteLine("Send file named {0}.txt",
                 stateObject.ReceivedNumber);
 
+            stateObject.WorkSocket.Shutdown(SocketShutdown.Both);
+            stateObject.WorkSocket.Close();
         }
 
         /// <summary>
@@ -162,7 +169,10 @@ namespace SimpleServer
         /// <returns></returns>
         private static string SelectFileFromStorge(int receivedNumber)
         {
-            return "1.txt";
+            return Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory.Replace(@"\bin\Debug", @"\files"),
+                string.Format("{0}.txt", receivedNumber));
+            
         }
 
         public class StateObject
@@ -190,7 +200,7 @@ namespace SimpleServer
 
                     try
                     {
-                        _receivedNumber = Convert.ToInt32(ReceivedData);
+                        _receivedNumber = Convert.ToInt32(ReceivedData.Replace("q",""));
                         return _receivedNumber;
                     }
                     catch (Exception)
