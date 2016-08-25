@@ -44,7 +44,6 @@ namespace SimpleServer
 
                     Console.WriteLine("Wait for connection to port {0}", ipEndPoint);
 
-
                     serverSocket.BeginAccept(
                         AcceptCallbak,
                         serverSocket);
@@ -105,7 +104,14 @@ namespace SimpleServer
                         stateObject.ReceivedData.Length, 
                         stateObject.ReceivedData);
 
-                    SendFiles(stateObject);
+                    var Html = "<html><body><h1>It works!</h1></body></html>";
+                    var Str = "HTTP/1.1 200 OK\nContent-type: text/html\nContent-Length:" + Html.Length.ToString() + "\n\n" + Html;
+
+                    var bStr = Encoding.ASCII.GetBytes(Str);
+
+                    stateObject.WorkSocket.Send(bStr);
+
+                    //SendFiles(stateObject);
 
                 }
                 else
