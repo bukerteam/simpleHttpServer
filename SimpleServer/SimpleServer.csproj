@@ -41,6 +41,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AsyncSocketListener_methods.cs" />
+    <Compile Include="Enums.cs" />
+    <Compile Include="StateObject.cs" />
+    <Compile Include="MyHttpResponse.cs" />
+    <Compile Include="MyHttpRequest.cs" />
     <Compile Include="AsyncSocketListener.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
