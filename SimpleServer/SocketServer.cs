@@ -10,11 +10,15 @@ using System.Threading;
 
 namespace SimpleServer
 {
-    public partial class AsyncSocketListener
+    public partial class SocketServer
     {
 
-        public const string ValidHttpVersion = "1.1";
+        public static HttpServerConfiguration HttpServerConfiguration { get; private set; }
 
+        //public const string ValidHttpVersion = "1.1";
+        //public const string MainPath = @"D:\Работа\WebServer\files";
+        //public const string Host = "localhost";
+        //public const int Port = 11000;
 
         /// <summary>
         /// 
@@ -25,16 +29,18 @@ namespace SimpleServer
         /// <summary>
         /// create listenig-socket and listen in async mode
         /// </summary>
-        public static void StartListening()
+        public static void StartListening(HttpServerConfiguration httpServerConfiguration)
         {
             // Устанавливаем для сокета локальную конечную точку
-            var ipHost = Dns.GetHostEntry("localhost");
-            var ipAddr = ipHost.AddressList[0];
-            var ipEndPoint = new IPEndPoint(ipAddr, 11000);
+            HttpServerConfiguration = httpServerConfiguration;
+            
+            var ipEndPoint = new IPEndPoint(
+                HttpServerConfiguration.ListenAddress,
+                HttpServerConfiguration.ListenPort);
 
             // Создаем сокет Tcp/Ip
             var serverSocket = new Socket(
-                ipAddr.AddressFamily,
+                HttpServerConfiguration.ListenAddress.AddressFamily,
                 SocketType.Stream,
                 ProtocolType.Tcp);
 
@@ -49,7 +55,7 @@ namespace SimpleServer
                 {
                     AllDone.Reset();
 
-                    Console.WriteLine("Wait for connection to port {0}", ipEndPoint);
+                    Console.WriteLine("Wait for connection to Port {0}", ipEndPoint);
 
                     serverSocket.BeginAccept(
                         AcceptCallbak,
@@ -77,51 +83,49 @@ namespace SimpleServer
         {
             AllDone.Set();
             var workSocket = ((Socket) ar.AsyncState).EndAccept(ar);
-            var stateObject = new StateObject
-            {
-                WorkSocket = workSocket
-            };
+            var httpRequest = new MyHttpRequest(workSocket);
+            
 
             workSocket.BeginReceive(
-                stateObject.Buffer,
+                httpRequest.Buffer,
                 0,
-                StateObject.BufferSize,
+                MyHttpRequest.BufferSize,
                 0,
                 ReceiveCallback,
-                stateObject);
+                httpRequest);
         }
 
         private static void ReceiveCallback(IAsyncResult ar)
         {
 
-            var stateObject = (StateObject) ar.AsyncState;
-            var readBytesCount = stateObject.WorkSocket.EndReceive(ar);
+            var httpRequest = (MyHttpRequest)ar.AsyncState;
+            var readBytesCount = httpRequest.WorkSocket.EndReceive(ar);
 
             if (readBytesCount > 0)
             {
-                stateObject.StringBuilder.Append(
+                httpRequest.StringBuilder.Append(
                     Encoding.ASCII.GetString(
-                        stateObject.Buffer,
+                        httpRequest.Buffer,
                         0,
                         readBytesCount));
 
-                if (stateObject.ReceivedData.IndexOf("\r\n\r\n", StringComparison.Ordinal) > -1)
+                if (httpRequest.ReceivedData.IndexOf("\r\n\r\n", StringComparison.Ordinal) > -1)
                 {
                     Console.WriteLine("Read {0} bytes from socket. \n Data : {1}",
-                        stateObject.ReceivedData.Length,
-                        stateObject.ReceivedData);
+                        httpRequest.ReceivedData.Length,
+                        httpRequest.ReceivedData);
 
-                    ProcessHttp(stateObject);
+                    ProcessHttpRequest(httpRequest);
                 }
                 else
                 {
-                    stateObject.WorkSocket.BeginReceive(
-                        stateObject.Buffer,
+                    httpRequest.WorkSocket.BeginReceive(
+                        httpRequest.Buffer,
                         0,
-                        StateObject.BufferSize,
+                        MyHttpRequest.BufferSize,
                         0,
                         ReceiveCallback,
-                        stateObject);
+                        httpRequest);
                 }
             }
         }
@@ -133,30 +137,13 @@ namespace SimpleServer
         private static void ProcessHttpCallBack(IAsyncResult ar)
         {
             var httpResponce = (MyHttpResponse) ar.AsyncState;
-            httpResponce.WorkSocket.EndSend(ar);
+            httpResponce.HttpRequest.WorkSocket.EndSend(ar);
 
-            Console.WriteLine("Send responce");
+            Console.WriteLine("Send responce with header: \n{0}",
+                httpResponce.Header);
 
-            httpResponce.WorkSocket.Shutdown(SocketShutdown.Both);
-            httpResponce.WorkSocket.Close();
+            httpResponce.HttpRequest.WorkSocket.Shutdown(SocketShutdown.Both);
+            httpResponce.HttpRequest.WorkSocket.Close();
         }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="ar"></param>
-        private static void SendFileCallback(IAsyncResult ar)
-        {
-            var stateObject = (StateObject) ar.AsyncState;
-            stateObject.WorkSocket.EndSendFile(ar);
-
-            Console.WriteLine("Send file named {0}.txt",
-                stateObject.ReceivedNumber);
-
-            stateObject.WorkSocket.Shutdown(SocketShutdown.Both);
-            stateObject.WorkSocket.Close();
-        }
-        
     }
-
 }

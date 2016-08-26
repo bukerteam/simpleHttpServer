@@ -10,7 +10,7 @@ using System.Threading;
 
 namespace SimpleServer
 {
-    public partial class AsyncSocketListener
+    public partial class SocketServer
     {
 
         /// <summary>
@@ -18,15 +18,44 @@ namespace SimpleServer
         /// </summary>
         public class MyHttpResponse
         {
-            private string _html;
             private byte[] _buffer;
-            private string _stringBuffer;
-            public HttpResponseAnswerCodes HttpRequestAnswerCode { get; set; }
 
-            public string HttpVersion { get; set; } 
+            /// <summary>
+            /// dictionary of mime type according to file extension
+            /// </summary>
+            private static readonly Dictionary<string, string> MimeContentType = new Dictionary<string, string> 
+            {
+                { ".text", "text/plain" },
+                { ".js", "text/javascript" },
+                { ".css", "text/css" },
+                { ".html", "text/html" },
+                { ".htm", "text/html" },
+                { ".png", "image/png" },
+                { ".ico", "image/x-icon" },
+                { ".gif", "image/gif" },
+                { ".bmp", "image/bmp" },
+                { ".jpg", "image/jpeg" },
+                { ".pdf", "application/pdf" }
+            };
 
-            public Dictionary<string, string> HeadersDict { get; set; }
+            /// <summary>
+            /// client http request, which this responce is based on
+            /// </summary>
+            public MyHttpRequest HttpRequest { get; private set; }
 
+            /// <summary>
+            /// response code - it differ from HttpStatusCode class because contain "_" chars
+            /// </summary>
+            public HttpResponseCodes HttpResponseCode { get; set; }
+           
+            /// <summary>
+            /// dictionary with headers pairs
+            /// </summary>
+            private Dictionary<string, string> HeadersDict { get; set; }
+
+            /// <summary>
+            /// header of MyHttpResponse based on HeadersDict
+            /// </summary>
             public string Header
             {
                 get
@@ -44,55 +73,59 @@ namespace SimpleServer
                 }
             }
 
-            public MyHttpRequest HttpRequest { get; private set; }
+            /// <summary>
+            /// stream with read content from require file
+            /// </summary>
+            public MemoryStream ContentStream { get; set; }
 
-            public const int BufferSize = 1024;
-            public Socket WorkSocket { get; set; }
-
-            public string Html
-            {
-                get
-                {
-                    return _html ??
-                           (_html = "<html><body><h1>Not ready yet, please wait...</h1></body></html>");
-                }
-                set { _html = value; }
-            }
-
-            public string StringBuffer
-            {
-                get
-                {
-                    return _stringBuffer ?? (_stringBuffer = 
-                        string.Format("HTTP/{0} {1} {2} \n{3}\n\n{4}",
-                            HttpVersion,
-                            (int)HttpRequestAnswerCode,
-                            HttpRequestAnswerCode.ToString().Replace("_", " "),
-                            Header,
-                            Html));
-                }
-            }
-
+            /// <summary>
+            /// final buffer with byte array, with is base of http response
+            /// </summary>
             public byte[] Buffer
             {
                 get
                 {
-                    return _buffer ?? (_buffer = Encoding.ASCII.GetBytes(StringBuffer));
+                    if (_buffer != null) return _buffer;
+
+                    var memoryStream = new MemoryStream(
+                        Encoding.ASCII.GetBytes(
+                            string.Format("HTTP/{0} {1} {2} \n{3}\n\n",
+                                HttpServerConfiguration.ValidHttpVersion,
+                                (int)HttpResponseCode,
+                                HttpResponseCode.ToString().Replace("_", " "),
+                                Header)));
+
+                    var bufferMemoryStream = new MemoryStream();
+                    
+                    
+                    memoryStream.CopyTo(bufferMemoryStream);
+                    
+                    ContentStream.Position = 0;
+                    ContentStream.CopyTo(bufferMemoryStream);
+                    
+                    _buffer = bufferMemoryStream.ToArray();
+                    return _buffer;
                 }
             }
 
-            public MyHttpResponse(MyHttpRequest httpRequest, Socket socket, string httpVersion)
+            /// <summary>
+            /// create instance of MyHttpResponse based on httpRequest (cause of this response)
+            /// </summary>
+            /// <param name="httpRequest"></param>
+            /// <param name="socket"></param>
+            public MyHttpResponse(MyHttpRequest httpRequest)
             {
-                HttpVersion = httpVersion;
                 HttpRequest = httpRequest;
-                WorkSocket = socket;
+                ContentStream = new MemoryStream();
 
-                _html = null;
                 _buffer = null;
-                HttpRequestAnswerCode = HttpResponseAnswerCodes.OK;
+                HttpResponseCode = HttpResponseCodes.OK;
                 HeadersDict = new Dictionary<string, string>();
             }
 
+            /// <summary>
+            /// create headers for response
+            /// </summary>
             public void CreateHeader()
             {
 
@@ -100,22 +133,28 @@ namespace SimpleServer
                     "Date", string.Format("{0:R}" ,DateTime.Now));
 
                 HeadersDict.Add(
-                    "Content-Length", Html.Length.ToString());
+                    "Content-Length", ContentStream.Length.ToString());
 
-                 HeadersDict.Add(
-                    "Content-type", System.Net.Mime.MediaTypeNames.Text.Html);
+                //HeadersDict.Add(
+                //    "Connection", "keep - alive");
 
-                switch (HttpRequestAnswerCode)
+                //HeadersDict.Add(
+                //    "Content-Encoding", "gzip");
+
+                 SpecifyMimeType();
+
+
+                switch (HttpResponseCode)
                 {
-                    case HttpResponseAnswerCodes.OK:
+                    case HttpResponseCodes.OK:
                     {
                         break;
                     }
-                    case HttpResponseAnswerCodes.Not_Found:
+                    case HttpResponseCodes.Not_Found:
                     {
                         break;
                     }
-                    case HttpResponseAnswerCodes.HTTP_Version_Not_Supported:
+                    case HttpResponseCodes.HTTP_Version_Not_Supported:
                     {
                         break;
                     }
@@ -126,65 +165,88 @@ namespace SimpleServer
             }
 
             /// <summary>
-            /// 
+            /// specify content according to HttpResponseCodes
             /// </summary>
-            public void CreateHtml()
+            public void SpecifyContent()
             {
-                switch (HttpRequestAnswerCode)
+                switch (HttpResponseCode)
                 {
-                    case HttpResponseAnswerCodes.OK:
+                    case HttpResponseCodes.Not_Found:
                     {
-                        Html = GetPage();
+                        HttpRequest.Uri = "404.html";
                         break;
                     }
-                    case HttpResponseAnswerCodes.Not_Found:
+                    case HttpResponseCodes.HTTP_Version_Not_Supported:
                     {
-                        Html = "<html><body><h1>Error 404: File not found</h1></body></html>";
-                        break;
-                    }
-                    case HttpResponseAnswerCodes.HTTP_Version_Not_Supported:
-                    {
-                        Html = "<html><body><h1>Error 505: Version Not Supported</h1></body></html>";
+                        HttpRequest.Uri = "505.html";
                         break;
                     }
                 }
             }
 
             /// <summary>
-            /// 
+            /// directly read and save content file to stream
             /// </summary>
-            /// <returns></returns>
-            private string GetPage()
+            public void ReadContentFile()
             {
-                return "<html><body><h1>This is valid page!</h1></body></html>";
+                var fs = new FileStream(
+                    Path.Combine(
+                        HttpServerConfiguration.RootDirectory, 
+                        HttpRequest.Uri), 
+                    FileMode.Open);
+
+                fs.CopyTo(ContentStream);
+                fs.Close();
+                
             }
+            
 
             /// <summary>
-            /// check and validate http request, and get relevant http code for it
+            /// check and validate http version request, and get relevant HttpResponseCodes for it
             /// </summary>
             public void CheckHttpVersion()
             {
-                if (HttpRequestAnswerCode == HttpResponseAnswerCodes.OK)
+                if (HttpResponseCode == HttpResponseCodes.OK)
                 {
-                    HttpRequestAnswerCode = 
-                        HttpRequest.HttpVersion != HttpVersion ? 
-                        HttpResponseAnswerCodes.HTTP_Version_Not_Supported : 
-                        HttpRequestAnswerCode;
+                    HttpResponseCode =
+                        HttpRequest.HttpVersion != HttpServerConfiguration.ValidHttpVersion ? 
+                        HttpResponseCodes.HTTP_Version_Not_Supported : 
+                        HttpResponseCode;
                 }
             }
 
             /// <summary>
-            /// check existing require page, and get relevant http code for it
+            /// check existing required page, and get relevant HttpResponseCodes code for it
             /// </summary>
-            public void CheckPage()
+            public void CheckPageExistence()
             {
-                if (HttpRequestAnswerCode == HttpResponseAnswerCodes.OK)
+                if (HttpResponseCode == HttpResponseCodes.OK)
                 {
+                    HttpResponseCode = !File.Exists(
+                        Path.Combine(
+                            HttpServerConfiguration.RootDirectory, 
+                            HttpRequest.Uri))
+                        ? HttpResponseCodes.Not_Found
+                        : HttpResponseCode;
                 }
             }
 
-            //TODO: заменить на HttpStatusCode
-            public enum HttpResponseAnswerCodes
+            private void SpecifyMimeType()
+            {
+                const string mimePattern = @"\.(.+)";
+                string mimeType;
+                if (!MimeContentType.TryGetValue(Regex.Match(HttpRequest.Uri, mimePattern).Value, out mimeType))
+                    mimeType = "text/plain";
+
+                HeadersDict.Add("Content-type", mimeType);
+            }
+
+
+            //TODO: придумать как заменить на HttpStatusCode
+            /// <summary>
+            /// custom response code - differ from HttpStatusCode, because contain "_" char in names
+            /// </summary>
+            public enum HttpResponseCodes
             {
                 OK = 200,
                 Not_Found = 404,
