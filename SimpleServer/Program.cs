@@ -13,6 +13,10 @@ namespace SimpleServer
 {
     internal class Program
     {
+        /// <summary>
+        /// main method
+        /// </summary>
+        /// <param name="args"></param>
         private static void Main(string[] args)
         {
             if (args.Length < 4)
@@ -46,9 +50,17 @@ namespace SimpleServer
             Console.ReadLine();
         }
 
+        /// <summary>
+        /// wait for user press 'q' char
+        /// </summary>
+        /// <param name="simpleHttpServer"></param>
         private static void WaitForQuit(SimpleHttpServer simpleHttpServer)
         {
-            while (Console.ReadLine() != "q"){}
+            Console.Write("\nFor exit press 'q' char...\n");
+            while (Console.ReadLine() != "q")
+            {
+                Console.Write("\nFor exit press 'q' char...\n");
+            }
             simpleHttpServer.Stop();
         }
     }
