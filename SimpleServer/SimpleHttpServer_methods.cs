@@ -10,19 +10,20 @@ using System.Threading;
 
 namespace SimpleServer
 {
-    public partial class SocketServer
+    public partial class SimpleHttpServer
     {
 
         /// <summary>
         /// process incoming http request subject to stateObject (contain data
         /// </summary>
         /// <param name="httpRequest"></param>
-        private static void ProcessHttpRequest(MyHttpRequest httpRequest)
+        private void ProcessHttpRequest(MyHttpRequest httpRequest)
         {
             httpRequest.ParseHttpRequest();
 
             var httpResponce = new MyHttpResponse(httpRequest);
 
+            httpResponce.CheckHost();
             httpResponce.CheckHttpVersion();
             httpResponce.CheckPageExistence();
             

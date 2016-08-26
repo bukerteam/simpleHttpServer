@@ -10,7 +10,7 @@ using System.Threading;
 
 namespace SimpleServer
 {
-    public partial class SocketServer
+    public partial class SimpleHttpServer
     {
 
         /// <summary>
@@ -76,7 +76,7 @@ namespace SimpleServer
             /// <summary>
             /// stream with read content from require file
             /// </summary>
-            public MemoryStream ContentStream { get; set; }
+            private MemoryStream ContentStream { get; set; }
 
             /// <summary>
             /// final buffer with byte array, with is base of http response
@@ -90,7 +90,7 @@ namespace SimpleServer
                     var memoryStream = new MemoryStream(
                         Encoding.ASCII.GetBytes(
                             string.Format("HTTP/{0} {1} {2} \n{3}\n\n",
-                                HttpServerConfiguration.ValidHttpVersion,
+                                HttpRequest.HttpServerConfiguration.ValidHttpVersion,
                                 (int)HttpResponseCode,
                                 HttpResponseCode.ToString().Replace("_", " "),
                                 Header)));
@@ -112,7 +112,6 @@ namespace SimpleServer
             /// create instance of MyHttpResponse based on httpRequest (cause of this response)
             /// </summary>
             /// <param name="httpRequest"></param>
-            /// <param name="socket"></param>
             public MyHttpResponse(MyHttpRequest httpRequest)
             {
                 HttpRequest = httpRequest;
@@ -135,8 +134,15 @@ namespace SimpleServer
                 HeadersDict.Add(
                     "Content-Length", ContentStream.Length.ToString());
 
-                //HeadersDict.Add(
-                //    "Connection", "keep - alive");
+                HeadersDict.Add(
+                    "Connection", "keep - alive");
+
+                HeadersDict.Add(
+                    "Last-Modified", string.Format("{0:R}", 
+                        File.GetLastWriteTime(
+                            Path.Combine(
+                                HttpRequest.HttpServerConfiguration.RootDirectory,
+                                HttpRequest.Uri))));
 
                 //HeadersDict.Add(
                 //    "Content-Encoding", "gzip");
@@ -160,27 +166,17 @@ namespace SimpleServer
                     }
                 }
 
-                HeadersDict.Add(
-                    "Last-Modified", string.Format("{0:R}", DateTime.Now));
+                
             }
 
             /// <summary>
-            /// specify content according to HttpResponseCodes
+            /// specify content according to HttpResponseCodes, if HttpResponseCodes is not OK
             /// </summary>
             public void SpecifyContent()
             {
-                switch (HttpResponseCode)
+                if (HttpResponseCode!= HttpResponseCodes.OK)
                 {
-                    case HttpResponseCodes.Not_Found:
-                    {
-                        HttpRequest.Uri = "404.html";
-                        break;
-                    }
-                    case HttpResponseCodes.HTTP_Version_Not_Supported:
-                    {
-                        HttpRequest.Uri = "505.html";
-                        break;
-                    }
+                    HttpRequest.Uri = string.Format("{0}.html", (int)HttpResponseCode);
                 }
             }
 
@@ -191,7 +187,7 @@ namespace SimpleServer
             {
                 var fs = new FileStream(
                     Path.Combine(
-                        HttpServerConfiguration.RootDirectory, 
+                        HttpRequest.HttpServerConfiguration.RootDirectory, 
                         HttpRequest.Uri), 
                     FileMode.Open);
 
@@ -199,7 +195,6 @@ namespace SimpleServer
                 fs.Close();
                 
             }
-            
 
             /// <summary>
             /// check and validate http version request, and get relevant HttpResponseCodes for it
@@ -209,7 +204,7 @@ namespace SimpleServer
                 if (HttpResponseCode == HttpResponseCodes.OK)
                 {
                     HttpResponseCode =
-                        HttpRequest.HttpVersion != HttpServerConfiguration.ValidHttpVersion ? 
+                        HttpRequest.HttpVersion != HttpRequest.HttpServerConfiguration.ValidHttpVersion ? 
                         HttpResponseCodes.HTTP_Version_Not_Supported : 
                         HttpResponseCode;
                 }
@@ -224,9 +219,23 @@ namespace SimpleServer
                 {
                     HttpResponseCode = !File.Exists(
                         Path.Combine(
-                            HttpServerConfiguration.RootDirectory, 
+                            HttpRequest.HttpServerConfiguration.RootDirectory, 
                             HttpRequest.Uri))
                         ? HttpResponseCodes.Not_Found
+                        : HttpResponseCode;
+                }
+            }
+
+            /// <summary>
+            /// check and validate incomint host - HttpServerConfiguration.HostNames must contain it
+            /// </summary>
+            public void CheckHost()
+            {
+                if (HttpResponseCode == HttpResponseCodes.OK)
+                {
+                    HttpResponseCode = !HttpRequest.HttpServerConfiguration.HostNames
+                        .Contains(HttpRequest.HeadersDict["Host"].Split(':')[0])
+                        ? HttpResponseCodes.Forbidden
                         : HttpResponseCode;
                 }
             }
@@ -249,8 +258,11 @@ namespace SimpleServer
             public enum HttpResponseCodes
             {
                 OK = 200,
+                Bad_Request = 400,
+                Forbidden = 403, 
                 Not_Found = 404,
                 HTTP_Version_Not_Supported = 505,
+
             }
         }
     }

@@ -10,7 +10,7 @@ using System.Threading;
 
 namespace SimpleServer
 {
-    public partial class SocketServer
+    public partial class SimpleHttpServer
     {
         
     }

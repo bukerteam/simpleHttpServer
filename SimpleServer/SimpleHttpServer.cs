@@ -10,10 +10,13 @@ using System.Threading;
 
 namespace SimpleServer
 {
-    public partial class SocketServer
+    public partial class SimpleHttpServer: IHttpServer
     {
+        private bool _isClosed;
 
-        public static HttpServerConfiguration HttpServerConfiguration { get; private set; }
+        private Socket ServerSocket { get; set; }
+
+        public HttpServerConfiguration HttpServerConfiguration { get; private set; }
 
         //public const string ValidHttpVersion = "1.1";
         //public const string MainPath = @"D:\Работа\WebServer\files";
@@ -23,13 +26,13 @@ namespace SimpleServer
         /// <summary>
         /// 
         /// </summary>
-        private static readonly ManualResetEventSlim AllDone = new ManualResetEventSlim(false);
+        private readonly ManualResetEventSlim _allDone = new ManualResetEventSlim(false);
 
 
         /// <summary>
-        /// create listenig-socket and listen in async mode
+        /// create server(listenig-socket), based on httpServerConfiguration, and start listen in async mode
         /// </summary>
-        public static void StartListening(HttpServerConfiguration httpServerConfiguration)
+        public void Start(HttpServerConfiguration httpServerConfiguration)
         {
             // Устанавливаем для сокета локальную конечную точку
             HttpServerConfiguration = httpServerConfiguration;
@@ -39,7 +42,7 @@ namespace SimpleServer
                 HttpServerConfiguration.ListenPort);
 
             // Создаем сокет Tcp/Ip
-            var serverSocket = new Socket(
+            ServerSocket = new Socket(
                 HttpServerConfiguration.ListenAddress.AddressFamily,
                 SocketType.Stream,
                 ProtocolType.Tcp);
@@ -47,43 +50,52 @@ namespace SimpleServer
             // Назначаем сокет локальной конечной точке и слушаем входящие сокеты
             try
             {
-                serverSocket.Bind(ipEndPoint);
-                serverSocket.Listen(10);
+                ServerSocket.Bind(ipEndPoint);
+                ServerSocket.Listen(10);
 
                 // Начинаем слушать соединения
-                while (true)
+                while (!_isClosed)
                 {
-                    AllDone.Reset();
+                    _allDone.Reset();
 
                     Console.WriteLine("Wait for connection to Port {0}", ipEndPoint);
 
-                    serverSocket.BeginAccept(
+                    ServerSocket.BeginAccept(
                         AcceptCallbak,
-                        serverSocket);
+                        ServerSocket);
 
-
-                    AllDone.Wait();
+                    _allDone.Wait();
                 }
+
+                ServerSocket.Close();
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.ToString());
             }
-            finally
-            {
-                Console.ReadLine();
-            }
         }
 
         /// <summary>
-        /// 
+        /// stop created server and sockets
+        /// </summary>
+        public void Stop()
+        {
+            _isClosed = true;
+            _allDone.Set();
+        }
+
+        /// <summary>
+        /// callbak method for Accept method 
         /// </summary>
         /// <param name="ar"></param>
-        private static void AcceptCallbak(IAsyncResult ar)
+        private void AcceptCallbak(IAsyncResult ar)
         {
-            AllDone.Set();
+            _allDone.Set();
+            if (_isClosed) return;
             var workSocket = ((Socket) ar.AsyncState).EndAccept(ar);
-            var httpRequest = new MyHttpRequest(workSocket);
+            var httpRequest = new MyHttpRequest(
+                workSocket,
+                HttpServerConfiguration);
             
 
             workSocket.BeginReceive(
@@ -95,9 +107,13 @@ namespace SimpleServer
                 httpRequest);
         }
 
-        private static void ReceiveCallback(IAsyncResult ar)
+        /// <summary>
+        /// callbak method for Receive method 
+        /// </summary>
+        /// <param name="ar"></param>
+        private void ReceiveCallback(IAsyncResult ar)
         {
-
+            if (_isClosed) return;
             var httpRequest = (MyHttpRequest)ar.AsyncState;
             var readBytesCount = httpRequest.WorkSocket.EndReceive(ar);
 
@@ -131,11 +147,12 @@ namespace SimpleServer
         }
 
         /// <summary>
-        /// 
+        /// callbak method for ProcessHttp method 
         /// </summary>
         /// <param name="ar"></param>
-        private static void ProcessHttpCallBack(IAsyncResult ar)
+        private void ProcessHttpCallBack(IAsyncResult ar)
         {
+            if (_isClosed) return;
             var httpResponce = (MyHttpResponse) ar.AsyncState;
             httpResponce.HttpRequest.WorkSocket.EndSend(ar);
 

@@ -42,11 +42,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="HttpServerConfiguration.cs" />
-    <Compile Include="SocketServer_methods.cs" />
+    <Compile Include="IHttpServer.cs" />
+    <Compile Include="SimpleHttpServer_methods.cs" />
     <Compile Include="Enums.cs" />
     <Compile Include="MyHttpResponse.cs" />
     <Compile Include="MyHttpRequest.cs" />
-    <Compile Include="SocketServer.cs" />
+    <Compile Include="SimpleHttpServer.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

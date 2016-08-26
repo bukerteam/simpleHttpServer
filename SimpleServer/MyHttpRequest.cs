@@ -10,7 +10,7 @@ using System.Threading;
 
 namespace SimpleServer
 {
-    public partial class SocketServer
+    public partial class SimpleHttpServer
     {
 
         /// <summary>
@@ -18,7 +18,7 @@ namespace SimpleServer
         /// </summary>
         public class MyHttpRequest
         {
-
+            public HttpServerConfiguration HttpServerConfiguration { get; set; }
             public string Method { get; private set; }
             public string Uri { get; set; }
             public string HttpVersion { get; private set; }
@@ -51,13 +51,15 @@ namespace SimpleServer
                 get { return _receivedData ?? (_receivedData = StringBuilder.ToString()); }
             }
 
-
             /// <summary>
             /// create instance of MyHttpRequest based on client work socket
             /// </summary>
             /// <param name="socket"></param>
-            public MyHttpRequest(Socket socket)
+            /// <param name="httpServerConfiguration"></param>
+            public MyHttpRequest(Socket socket, 
+                HttpServerConfiguration httpServerConfiguration)
             {
+                HttpServerConfiguration = httpServerConfiguration;
                 WorkSocket = socket;
                 StringBuilder = new StringBuilder();
                 Buffer = new byte[BufferSize];
