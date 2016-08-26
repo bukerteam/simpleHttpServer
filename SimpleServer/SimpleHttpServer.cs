@@ -67,6 +67,7 @@ namespace SimpleServer
                     _allDone.Wait();
                 }
 
+                ServerSocket.Shutdown(SocketShutdown.Both);
                 ServerSocket.Close();
             }
             catch (Exception ex)
