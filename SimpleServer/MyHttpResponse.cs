@@ -197,6 +197,21 @@ namespace SimpleServer
             }
 
             /// <summary>
+            /// check if request method is GET
+            /// </summary>
+            public void CheckMethod()
+            {
+                if (HttpResponseCode == HttpResponseCodes.OK)
+                {
+                    HttpResponseCode =
+                        HttpRequest.Method != "GET" ?
+                        HttpResponseCodes.Forbidden :
+                        HttpResponseCode;
+                }
+            }
+
+
+            /// <summary>
             /// check and validate http version request, and get relevant HttpResponseCodes for it
             /// </summary>
             public void CheckHttpVersion()

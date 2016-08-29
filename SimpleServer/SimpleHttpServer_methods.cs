@@ -24,6 +24,7 @@ namespace SimpleServer
             var httpResponce = new MyHttpResponse(httpRequest);
 
             httpResponce.CheckHost();
+            httpResponce.CheckMethod();
             httpResponce.CheckHttpVersion();
             httpResponce.CheckPageExistence();
             
