@@ -20,6 +20,8 @@ namespace SimpleServer
         {
             HostNames = new List<string>
             {
+                "176.112.216.155",
+                "127.0.0.1",
                 "localhost",
             };
         }

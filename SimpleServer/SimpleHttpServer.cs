@@ -34,26 +34,24 @@ namespace SimpleServer
         /// </summary>
         public void Start(HttpServerConfiguration httpServerConfiguration)
         {
-            // Устанавливаем для сокета локальную конечную точку
             HttpServerConfiguration = httpServerConfiguration;
             
             var ipEndPoint = new IPEndPoint(
                 HttpServerConfiguration.ListenAddress,
                 HttpServerConfiguration.ListenPort);
 
-            // Создаем сокет Tcp/Ip
-            ServerSocket = new Socket(
+           ServerSocket = new Socket(
                 HttpServerConfiguration.ListenAddress.AddressFamily,
                 SocketType.Stream,
                 ProtocolType.Tcp);
 
-            // Назначаем сокет локальной конечной точке и слушаем входящие сокеты
+            // bind socket to endpoint and start listen
             try
             {
                 ServerSocket.Bind(ipEndPoint);
                 ServerSocket.Listen(10);
 
-                // Начинаем слушать соединения
+                // start listen
                 while (!_isClosed)
                 {
                     _allDone.Reset();
@@ -66,8 +64,7 @@ namespace SimpleServer
 
                     _allDone.Wait();
                 }
-
-                ServerSocket.Shutdown(SocketShutdown.Both);
+                
                 ServerSocket.Close();
             }
             catch (Exception ex)
