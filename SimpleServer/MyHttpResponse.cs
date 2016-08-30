@@ -135,7 +135,7 @@ namespace SimpleServer
                         File.GetLastWriteTime(
                             Path.Combine(
                                 HttpRequest.HttpServerConfiguration.RootDirectory,
-                                HttpRequest.Uri))));
+                                HttpRequest.Uri.AbsolutePath.TrimStart('/')))));
 
 
                 if (HttpRequest.HeadersDict.ContainsKey("Accept-Encoding") &&
@@ -155,7 +155,10 @@ namespace SimpleServer
             {
                 if (HttpResponseCode!= HttpResponseCodes.OK)
                 {
-                    HttpRequest.Uri = string.Format("{0}.html", (int)HttpResponseCode);
+                    HttpRequest.Uri = new Uri(
+                        string.Format("http://{0}/{1}.html", 
+                        HttpRequest.Uri.Host,
+                        (int)HttpResponseCode));
                 }
             }
 
@@ -167,7 +170,7 @@ namespace SimpleServer
                 var fs = new FileStream(
                     Path.Combine(
                         HttpRequest.HttpServerConfiguration.RootDirectory, 
-                        HttpRequest.Uri), 
+                        HttpRequest.Uri.AbsolutePath.TrimStart('/')), 
                     FileMode.Open);
 
                 fs.CopyTo(ContentStream);
@@ -213,8 +216,8 @@ namespace SimpleServer
                 {
                     HttpResponseCode = !File.Exists(
                         Path.Combine(
-                            HttpRequest.HttpServerConfiguration.RootDirectory, 
-                            HttpRequest.Uri))
+                            HttpRequest.HttpServerConfiguration.RootDirectory,
+                            HttpRequest.Uri.AbsolutePath.TrimStart('/')))
                         ? HttpResponseCodes.Not_Found
                         : HttpResponseCode;
                 }
@@ -291,12 +294,14 @@ namespace SimpleServer
             /// </summary>
             private void SpecifyMimeType()
             {
-                const string mimePattern = @"\.[^\.]+$";
+               
                 string mimeType;
 
+
+                
                 if (!MimeContentType
                     .TryGetValue(
-                        Regex.Match(HttpRequest.Uri, mimePattern).Value, 
+                        Path.GetExtension(HttpRequest.Uri.AbsolutePath), 
                         out mimeType))
                     mimeType = "text/plain";
 

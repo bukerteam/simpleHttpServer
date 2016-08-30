@@ -40,7 +40,7 @@ namespace SimpleServer
                 }
 
                 args[2] = "localhost";
-                args[3] = "1.1";
+                args[3] = "HTTP/1.1";
             }
 
             //temp ip for testWebServer (flops.ru)

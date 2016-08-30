@@ -20,7 +20,7 @@ namespace SimpleServer
         {
             public HttpServerConfiguration HttpServerConfiguration { get; set; }
             public string Method { get; private set; }
-            public string Uri { get; set; }
+            public Uri Uri { get; set; }
             public string HttpVersion { get; private set; }
             public Dictionary<string, string> HeadersDict { get; set; }
 
@@ -71,38 +71,45 @@ namespace SimpleServer
             /// <returns></returns>
             public void ParseHttpRequest()
             {
-                const string methodPattern = @"^([A-Z]+)\s";
-                const string uriPattern = @"\s/(.+)\sHTTP";
-                const string httpVersionPattern = @"\sHTTP/([1,0,\.]+)\r";
+                #region patterns
+
+                //const string methodPattern = @"^([A-Z]+)\s";
+                //const string uriPattern = @"\s/(.+)\sHTTP";
+                //const string httpVersionPattern = @"\sHTTP/([1,0,\.]+)\r";
+                //const string responceHeadersPattern = "\n((.+): (.+))\r";
+
+                #endregion
+                
+                var requestParts = ReceivedData.Split(new[] {"\r\n"}, StringSplitOptions.None);
+                var requestStringParts = requestParts[0].Split(' ');
+
+                Method = requestStringParts[0];
+                var uri = requestStringParts[1];
+                if (uri.StartsWith("/"))
+                    uri = string.Format(@"localhost{0}", uri);
 
 
-                const string responceParamsPattern = "\n((.+): (.+))\r";
+                Uri = new Uri(string.Format(@"http://{0}", uri));
+                HttpVersion = requestStringParts[2];
 
-                var methodRegex = new Regex(methodPattern);
-                var uriRegex = new Regex(uriPattern);
-                var httpVersionRegex = new Regex(httpVersionPattern);
-                var headersRegex = new Regex(responceParamsPattern);
-
-                Method = methodRegex.Match(ReceivedData).Groups[1].Value;
-                Uri = uriRegex.Match(ReceivedData).Groups[1].Value;
-
-                if (Uri == "")
+                if (Uri.AbsolutePath == "/")
                 {
-                    Uri = "index.html";
+                    Uri = new Uri(string.Format(@"http://{0}/{1}",
+                        Uri.Host,
+                        "/index.html"));
                 }
 
+                HeadersDict = new Dictionary<string, string>();
+                for (var i = 1; i < requestParts.Length; i++)
+                {
+                    var headerPair =
+                        requestParts[i].Split(new string[1] {": "}, StringSplitOptions.None);
+                    if (headerPair.Length == 2)
+                    {
+                        HeadersDict.Add(headerPair[0], headerPair[1]);
+                    }
 
-                HttpVersion = httpVersionRegex.Match(ReceivedData).Groups[1].Value;
-                HeadersDict =   
-                    headersRegex.Matches(ReceivedData)
-                        .Cast<Match>()
-                        .Select(reqMatch =>
-                            reqMatch.Groups[1].Value.Split(new[] { ": " }, StringSplitOptions.None))
-                        .Where(dictElGroup =>
-                            dictElGroup.Length == 2)
-                        .ToDictionary(
-                            dictElGroup => dictElGroup[0],
-                            dictElGroup => dictElGroup[1]);
+                }
             }
         }
     }
