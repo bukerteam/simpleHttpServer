@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -86,24 +87,16 @@ namespace SimpleServer
                 get
                 {
                     if (_buffer != null) return _buffer;
-
-                    var memoryStream = new MemoryStream(
-                        Encoding.ASCII.GetBytes(
-                            string.Format("HTTP/{0} {1} {2} \n{3}\n\n",
-                                HttpRequest.HttpServerConfiguration.ValidHttpVersion,
-                                (int)HttpResponseCode,
-                                HttpResponseCode.ToString().Replace("_", " "),
-                                Header)));
-
                     var bufferMemoryStream = new MemoryStream();
-                    
-                    
-                    memoryStream.CopyTo(bufferMemoryStream);
-                    
-                    ContentStream.Position = 0;
-                    ContentStream.CopyTo(bufferMemoryStream);
-                    
+
+                    var contentMemoryStream = GetContentPartOfBuffer();
+                    var headerMemoryStream = GetHeaderPartOfBuffer();
+
+                    headerMemoryStream.CopyTo(bufferMemoryStream);
+                    contentMemoryStream.CopyTo(bufferMemoryStream);
+
                     _buffer = bufferMemoryStream.ToArray();
+
                     return _buffer;
                 }
             }
@@ -135,7 +128,7 @@ namespace SimpleServer
                     "Content-Length", ContentStream.Length.ToString());
 
                 HeadersDict.Add(
-                    "Connection", "keep - alive");
+                    "Connection", "keep-alive");
 
                 HeadersDict.Add(
                     "Last-Modified", string.Format("{0:R}", 
@@ -144,29 +137,15 @@ namespace SimpleServer
                                 HttpRequest.HttpServerConfiguration.RootDirectory,
                                 HttpRequest.Uri))));
 
-                //HeadersDict.Add(
-                //    "Content-Encoding", "gzip");
 
-                 SpecifyMimeType();
-
-
-                switch (HttpResponseCode)
+                if (HttpRequest.HeadersDict.ContainsKey("Accept-Encoding") &&
+                    HttpRequest.HeadersDict["Accept-Encoding"].Contains("gzip"))
                 {
-                    case HttpResponseCodes.OK:
-                    {
-                        break;
-                    }
-                    case HttpResponseCodes.Not_Found:
-                    {
-                        break;
-                    }
-                    case HttpResponseCodes.HTTP_Version_Not_Supported:
-                    {
-                        break;
-                    }
+                    HeadersDict.Add(
+                        "Content-Encoding", "gzip");
                 }
 
-                
+                 SpecifyMimeType();
             }
 
             /// <summary>
@@ -255,11 +234,70 @@ namespace SimpleServer
                 }
             }
 
+
+            /// <summary>
+            /// get MemoryStream - part of response buffer, responsible for content
+            /// </summary>
+            /// <returns></returns>
+            private MemoryStream GetContentPartOfBuffer()
+            {
+                ContentStream.Position = 0;
+
+                var contentMemoryStream = new MemoryStream();
+
+                if (HeadersDict.ContainsKey("Content-Encoding") &&
+                    HeadersDict["Content-Encoding"].Contains("gzip"))
+                {
+
+                    var gZipStream = new GZipStream(
+                        contentMemoryStream,
+                        CompressionMode.Compress,
+                        true);
+
+                    ContentStream.CopyTo(gZipStream);
+                    gZipStream.Close();
+
+                    HeadersDict["Content-Length"] = contentMemoryStream.Length.ToString();
+                }
+                else
+                {
+                    ContentStream.CopyTo(contentMemoryStream);
+                }
+
+                contentMemoryStream.Position = 0;
+
+                return contentMemoryStream;
+            }
+
+            /// <summary>
+            /// get MemoryStream - part of response buffer, responsible for header
+            /// </summary>
+            /// <returns></returns>
+            private MemoryStream GetHeaderPartOfBuffer()
+            {
+                var headerMemoryStream = new MemoryStream(
+                    Encoding.ASCII.GetBytes(
+                        string.Format("HTTP/{0} {1} {2} \n{3}\n\n",
+                            HttpRequest.HttpServerConfiguration.ValidHttpVersion,
+                            (int)HttpResponseCode,
+                            HttpResponseCode.ToString().Replace("_", " "),
+                            Header)));
+
+                return headerMemoryStream;
+            }
+
+            /// <summary>
+            /// specify mime type depends on file extension
+            /// </summary>
             private void SpecifyMimeType()
             {
-                const string mimePattern = @"\.(.+)";
+                const string mimePattern = @"\.[^\.]+$";
                 string mimeType;
-                if (!MimeContentType.TryGetValue(Regex.Match(HttpRequest.Uri, mimePattern).Value, out mimeType))
+
+                if (!MimeContentType
+                    .TryGetValue(
+                        Regex.Match(HttpRequest.Uri, mimePattern).Value, 
+                        out mimeType))
                     mimeType = "text/plain";
 
                 HeadersDict.Add("Content-type", mimeType);

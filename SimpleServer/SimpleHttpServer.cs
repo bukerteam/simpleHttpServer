@@ -125,7 +125,7 @@ namespace SimpleServer
 
                 if (httpRequest.ReceivedData.IndexOf("\r\n\r\n", StringComparison.Ordinal) > -1)
                 {
-                    Console.WriteLine("Read {0} bytes from socket. \n Data : {1}",
+                    Console.WriteLine("\n\nRead {0} bytes from socket. \nData : {1}",
                         httpRequest.ReceivedData.Length,
                         httpRequest.ReceivedData);
 
@@ -154,7 +154,7 @@ namespace SimpleServer
             var httpResponce = (MyHttpResponse) ar.AsyncState;
             httpResponce.HttpRequest.WorkSocket.EndSend(ar);
 
-            Console.WriteLine("Send responce with header: \n{0}",
+            Console.WriteLine("\nSend responce with header: \n{0}\n",
                 httpResponce.Header);
 
             httpResponce.HttpRequest.WorkSocket.Shutdown(SocketShutdown.Both);

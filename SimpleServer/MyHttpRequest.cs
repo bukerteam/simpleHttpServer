@@ -85,6 +85,13 @@ namespace SimpleServer
 
                 Method = methodRegex.Match(ReceivedData).Groups[1].Value;
                 Uri = uriRegex.Match(ReceivedData).Groups[1].Value;
+
+                if (Uri == "")
+                {
+                    Uri = "index.html";
+                }
+
+
                 HttpVersion = httpVersionRegex.Match(ReceivedData).Groups[1].Value;
                 HeadersDict =   
                     headersRegex.Matches(ReceivedData)

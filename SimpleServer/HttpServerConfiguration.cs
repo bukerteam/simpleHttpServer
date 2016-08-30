@@ -23,6 +23,7 @@ namespace SimpleServer
                 "176.112.216.155",
                 "127.0.0.1",
                 "localhost",
+                "simpleserver.ru",
             };
         }
     }
